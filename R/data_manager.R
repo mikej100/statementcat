@@ -1,6 +1,9 @@
-library(openxlsx)
-library(usethis)
 library(dplyr)
+library(naivebayes)
+library(openxlsx)
+library(stringr)
+library(tidyr)
+library(usethis)
 
 use_test()
 
@@ -29,3 +32,16 @@ get_source_txns <- function (txns){
   )
 }
 
+prep_data <- function (raw) {
+  raw |>
+    drop_na(Type, Category) |>
+    mutate(class = paste(Type, Category, sep = "-"))  |>
+    mutate(words = str_split(str_squish(Description), " "))
+
+}
+raw$words
+
+
+make_model_1 <- function (classes, features) {
+  model <- naive_bayes(classes, features, laplace = 1 )
+}
