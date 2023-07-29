@@ -22,15 +22,13 @@ test_that("Prepare data",{
 
 word_list <- unique(unlist(train$words)) |>
   keep( ~ str_length(.x) > 0)
+test_that("Find words in list",{
+  word_found <- words_list[[1]], train$words[[1]]
+})
+test_that"Find words in words_df", {
+  word_table <- make_word_table(train$words[1:5], words_list[1:2])
 
-word_in_descr <- function(d, w) {
-  any(d, ~ str_match(.x, fixed(w)) )
 }
-
-
-words_df <- map(word_list, ~ ), fixed(.x)) ) |>
-  set_names(word_list) |>
-  as_tibble()
 
 test_that("train naive Bayes model",{
   model <- make_model_1(train$class, train$words)
