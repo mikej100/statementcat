@@ -41,27 +41,16 @@ prep_data <- function (raw) {
 
 }
 
-word_in_descr <- function(d, w) {
-  any(d, ~ str_match(.x, fixed(w)) )
+make_word_incidence_table <- function (words) {
+  word_list <- unique(unlist(words)) |>
+    keep( ~ str_length(.x) > 0)
+
+  target_in_words <- function(target, fwords) {
+    map(fwords, \(ws) target %in% ws )
+  }
+
+  word_table <- map( word_list, \(t) target_in_words(t, words) )
 }
-
-# any (list("AMNESTY", "b"), ~ str_detect("AMNESTY", .x) )
-# map(word_list[1:3], ~ any (str_detect(train$words[[1]], fixed(.x) )
-# any(train$words[[1]], ~str_match(.x), word_list[[1 ]])
-# q <- any(c("A","B"), ~ str_match(.x), "A")
-
-any(train$words[1], ~ .x == "AMNESTY")
-
-word_table <- map( train$words, ~ word_list %in% .x)
-
-
-
-make_words_
-  map(word_list, ~ ), fixed(.x)) ) |>
-  set_names(word_list) |>
-  as_tibble()
-raw$words
-
 
 make_model_1 <- function (classes, features) {
   model <- naive_bayes(classes, features, laplace = 1 )
