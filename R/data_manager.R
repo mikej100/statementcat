@@ -6,30 +6,33 @@ library(stringr)
 library(tidyr)
 library(usethis)
 
-use_test()
+#use_test()
 
 load_wb_data <- function (filepath){
   tx_raw <- read.xlsx(
     filepath,
     sheet = "Txns"
   )
-
 }
 
-get_source_txns <- function (txns){
-  tx1 <- txns |>
+get_source_txns <- function (txns_raw, sample_rate=1.0){
+  train_prop = 0.8
+  tx1 <- txns_raw |>
     filter(Account == 2102) |>
     filter(!is.na(Category)) |>
     select(Date, Amount, Description, Type, Category)
 
   set.seed(1)
-  train_prop = 0.8
-  sample <- sample(c(TRUE, FALSE), nrow(txns), replace=TRUE,
-                   prob=c(train_prop, 1 - train_prop))
+  buckets <- c("train", "test", "drop")
+  sample <- sample( buckets, nrow(txns_raw), replace=TRUE,
+                    prob=c( sample_rate*train_prop,
+                            sample_rate * (1 - train_prop),
+                            1 - sample_rate
+                    ))
   # could do improve perf by partitioning in one step
   source_txn <- list (
-    "train"  = tx1[sample, ],
-    "test" = tx1[!sample, ]
+    "train"  = tx1[sample=="train", ],
+    "test" = tx1[sample=="test", ]
   )
 }
 
@@ -46,12 +49,15 @@ make_word_incidence_table <- function (words) {
     keep( ~ str_length(.x) > 0)
 
   target_in_words <- function(target, fwords) {
-    map(fwords, \(ws) target %in% ws )
+    map_lgl(fwords, \(ws) target %in% ws )
   }
 
-  word_table <- map( word_list, \(t) target_in_words(t, words) )
+  word_table <- map( word_list, \(t) target_in_words(t, words) ) |>
+    set_names(word_list) |>
+    as_tibble()
 }
 
-make_model_1 <- function (classes, features) {
-  model <- naive_bayes(classes, features, laplace = 1 )
+make_model_1 <- function (features, class) {
+  model <- naive_bayes(x = features, y = class, laplace = 1)
 }
+
