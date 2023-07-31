@@ -6,7 +6,7 @@ library(stringr)
 library(tidyr)
 library(usethis)
 
-#use_test()
+use_test()
 
 load_wb_data <- function (filepath){
   tx_raw <- read.xlsx(
@@ -25,11 +25,11 @@ get_source_txns <- function (txns_raw, sample_rate=1.0){
   set.seed(1)
   buckets <- c("train", "test", "drop")
   sample <- sample( buckets, nrow(txns_raw), replace=TRUE,
-                    prob=c( sample_rate*train_prop,
+                    prob=c( sample_rate * train_prop,
                             sample_rate * (1 - train_prop),
                             1 - sample_rate
                     ))
-  # could do improve perf by partitioning in one step
+
   source_txn <- list (
     "train"  = tx1[sample=="train", ],
     "test" = tx1[sample=="test", ]
@@ -52,7 +52,7 @@ make_word_incidence_table <- function (words) {
     map_lgl(fwords, \(ws) target %in% ws )
   }
 
-  word_table <- map( word_list, \(t) target_in_words(t, words) ) |>
+  map( word_list, \(t) target_in_words(t, words) ) |>
     set_names(word_list) |>
     as_tibble()
 }

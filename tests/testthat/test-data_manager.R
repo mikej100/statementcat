@@ -23,7 +23,6 @@ test_that("Load subset of transactions from test file", {
 
 test_that("Prepare data",{
   train <<- prep_data(txns$train)
-  test <<- prep_data(txns$test)
   expect_gt(length(train$class), 50)
   expect_gt(length(train$words), 50)
 })
@@ -37,7 +36,18 @@ test_that("Create table of word incidence",{
 test_that("train naive Bayes model",{
   train_class <- train$class
   model <<- make_model_1(incidence_table, train_class)
-  expect_lte( tables(model, which=(names(incidence_table[1]))) [[1]][1], 1.0)
+  expect_lte( tables(model, which=(names(incidence_table[1])) )[[1]][1], 1.0)
 })
 
-predict(model, test, type = "class")
+test_that("Predict from test data ")
+  test <- prep_data(txns$test)
+  test_features <- make_word_incidence_table(test$words)
+  pred <- predict(model, test_features, type = "class")
+  prob <- predict(model, test_features, type = "prob")
+results_table <- tibble(
+  actual = test$class,
+  pred = pred,
+  correct = actual == pred,
+  prob = imap_dbl(pred, \(p,i) prob[i,p])
+)
+
