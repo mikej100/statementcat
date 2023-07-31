@@ -1,9 +1,6 @@
 library(testthat)
 library(ggplot2)
 library(usethis)
-test_that("multiplication works", {
-  expect_equal(2 * 2, 4)
-})
 
 # use_r()
 
@@ -53,7 +50,8 @@ test_that("Predict from test data ",{
 test_that("Build results table",{
   results <<- make_results_table (test, pred)
   ggplot(results, aes(x=prob, fill=correct) ) +
-    geom_histogram(bins=100)
+    geom_histogram(bins=9) +
+    coord_cartesian(xlim=c(0.5,1), ylim=c(0, length(results$prob)))
 
   cum_correct <- function(p) {
     results |> filter(prob > p) |>
@@ -62,14 +60,17 @@ test_that("Build results table",{
                 wrong = n() - right,
                 mean = mean(correct))
   }
-  d2 <- map(seq(from=.9 ,to = .99, length.out = 10), ~ cum_correct(.x) ) |>
+  d2 <- map(seq(from=.5 ,to = .99, length.out = 10), ~ cum_correct(.x) ) |>
     list_rbind()
-  ggplot(d2, aes (x=prob, wrong ) ) +
+  ggplot(d2, aes (x=prob, right ) ) +
+    geom_col()
+  d3 <- map(c(0.7,0.5,0), ~ cum_correct(.x) ) |>
+    list_rbind()
+  ggplot(d3, aes (x=prob, right ) ) +
     geom_col()
 
-  uiesuts_cut <- cut_interval(results, 10)
-  ggplot(results, aes(x=cut_interval(prob,11), y=n(correct)) )+
-    geom_line()
 })
 
 hiprob_misses <- results |> filter(prob > 0.94, correct==FALSE )
+loprob_misses <- results |> filter(prob < 0.5, correct==FALSE )
+loprob_all <- results |> filter(prob < 0.5)

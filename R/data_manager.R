@@ -68,6 +68,7 @@ make_results_table <- function(test, pred) {
      actual = test$class,
      predicted = pred$class,
      correct = actual == predicted ,
-     prob = imap_dbl(pred$class, \(c,i) pred$prob[i,c])
+     prob = imap_dbl(pred$class, \(c,i) pred$prob[i,c]),
+     description = test$Description
    )
 }
