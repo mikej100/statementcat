@@ -18,7 +18,7 @@ load_wb_data <- function (filepath){
 get_source_txns <- function (txns_raw, sample_rate=1.0){
   train_prop = 0.8
   tx1 <- txns_raw |>
-    mutate(row = 1:length(txns_raw[[1]])) |>
+    mutate(row = 2:(length(txns_raw[[1]]) + 1) ) |>
     filter(Account == 2102) |>
     filter(!is.na(Category)) |>
     select(row, Date, Amount, Description, Type, Category)

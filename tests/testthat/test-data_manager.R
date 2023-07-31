@@ -5,10 +5,11 @@ test_that("multiplication works", {
   expect_equal(2 * 2, 4)
 })
 
-use_r()
+# use_r()
 
 test_that("Reads transactions from test file", {
-  source_file <- "../not_in_repo/Accounting_20230516.xlsm"
+  source_file <- "../not_in_repo/Accounting_20230731.xlsm"
+#  source_file <- "../../../not_in_repo/Accounting_20230731.xlsm"
   df <- load_wb_data(source_file)
   txns <<- get_source_txns(df)
   expect_gt(length(txns$train$Date), 1000)
@@ -51,8 +52,24 @@ test_that("Predict from test data ",{
 })
 test_that("Build results table",{
   results <<- make_results_table (test, pred)
-})
-
   ggplot(results, aes(x=prob, fill=correct) ) +
     geom_histogram(bins=100)
-hiprob_misses <- results |> filter(prob > 0.96, correct==FALSE )
+
+  cum_correct <- function(p) {
+    results |> filter(prob > p) |>
+      summarise(prob = p,
+                right = sum(correct),
+                wrong = n() - right,
+                mean = mean(correct))
+  }
+  d2 <- map(seq(from=.9 ,to = .99, length.out = 10), ~ cum_correct(.x) ) |>
+    list_rbind()
+  ggplot(d2, aes (x=prob, wrong ) ) +
+    geom_col()
+
+  uiesuts_cut <- cut_interval(results, 10)
+  ggplot(results, aes(x=cut_interval(prob,11), y=n(correct)) )+
+    geom_line()
+})
+
+hiprob_misses <- results |> filter(prob > 0.94, correct==FALSE )
