@@ -6,7 +6,7 @@ library(stringr)
 library(tidyr)
 library(usethis)
 
-use_test()
+# use_test()
 
 load_wb_data <- function (filepath){
   tx_raw <- read.xlsx(
@@ -18,9 +18,10 @@ load_wb_data <- function (filepath){
 get_source_txns <- function (txns_raw, sample_rate=1.0){
   train_prop = 0.8
   tx1 <- txns_raw |>
+    mutate(row = 1:length(txns_raw[[1]])) |>
     filter(Account == 2102) |>
     filter(!is.na(Category)) |>
-    select(Date, Amount, Description, Type, Category)
+    select(row, Date, Amount, Description, Type, Category)
 
   set.seed(1)
   buckets <- c("train", "test", "drop")
@@ -46,7 +47,7 @@ prep_data <- function (raw) {
 
 make_word_incidence_table <- function (words) {
   word_list <- unique(unlist(words)) |>
-    keep( ~ str_length(.x) > 0)
+    keep( \(w) str_length(w) > 0)
 
   target_in_words <- function(target, fwords) {
     map_lgl(fwords, \(ws) target %in% ws )
@@ -61,3 +62,12 @@ make_model_1 <- function (features, class) {
   model <- naive_bayes(x = features, y = class, laplace = 1)
 }
 
+make_results_table <- function(test, pred) {
+   table <- tibble(
+     row = test$row,
+     actual = test$class,
+     predicted = pred$class,
+     correct = actual == predicted ,
+     prob = imap_dbl(pred$class, \(c,i) pred$prob[i,c])
+   )
+}

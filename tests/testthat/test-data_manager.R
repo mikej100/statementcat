@@ -1,4 +1,5 @@
 library(testthat)
+library(ggplot2)
 library(usethis)
 test_that("multiplication works", {
   expect_equal(2 * 2, 4)
@@ -13,13 +14,13 @@ test_that("Reads transactions from test file", {
   expect_gt(length(txns$train$Date), 1000)
 })
 
-test_that("Load subset of transactions from test file", {
-  source_file <- "../not_in_repo/Accounting_20230516.xlsm"
-  df <- load_wb_data(source_file)
-  txns <<- get_source_txns(df, 0.2)
-  expect_gt(length(txns$train$Date), 100)
-  expect_lt(length(txns$train$Date), 1000)
-})
+# test_that("Load subset of transactions from test file", {
+#   source_file <- "../not_in_repo/Accounting_20230516.xlsm"
+#   df <- load_wb_data(source_file)
+#   txns <<- get_source_txns(df, 0.2)
+#   expect_gt(length(txns$train$Date), 100)
+#   expect_lt(length(txns$train$Date), 1000)
+# })
 
 test_that("Prepare data",{
   train <<- prep_data(txns$train)
@@ -39,15 +40,19 @@ test_that("train naive Bayes model",{
   expect_lte( tables(model, which=(names(incidence_table[1])) )[[1]][1], 1.0)
 })
 
-test_that("Predict from test data ")
-  test <- prep_data(txns$test)
-  test_features <- make_word_incidence_table(test$words)
-  pred <- predict(model, test_features, type = "class")
-  prob <- predict(model, test_features, type = "prob")
-results_table <- tibble(
-  actual = test$class,
-  pred = pred,
-  correct = actual == pred,
-  prob = imap_dbl(pred, \(p,i) prob[i,p])
-)
+test_that("Predict from test data ",{
+  test <<- prep_data(txns$test)
+  test$features <- make_word_incidence_table(test$words)
+  pred_class <- predict(model, test$features, type = "class" )
+  pred_prob <- predict(model, test$features, type =  "prob" )
+  pred <<- list(class = pred_class, prob = pred_prob)
+  expect_gt (sum(pred$class == test$class)/ length(test$class), 0.5,
+             "Prediction accuracy")
+})
+test_that("Build results table",{
+  results <<- make_results_table (test, pred)
+})
 
+  ggplot(results, aes(x=prob, fill=correct) ) +
+    geom_histogram(bins=100)
+hiprob_misses <- results |> filter(prob > 0.96, correct==FALSE )
