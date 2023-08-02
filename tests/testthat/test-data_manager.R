@@ -52,25 +52,34 @@ test_that("Build results table",{
   ggplot(results, aes(x=prob, fill=correct) ) +
     geom_histogram(bins=9) +
     coord_cartesian(xlim=c(0.5,1), ylim=c(0, length(results$prob)))
-
-  cum_correct <- function(p) {
-    results |> filter(prob > p) |>
-      summarise(prob = p,
-                right = sum(correct),
-                wrong = n() - right,
-                mean = mean(correct))
-  }
-  d2 <- map(seq(from=.5 ,to = .99, length.out = 10), ~ cum_correct(.x) ) |>
-    list_rbind()
-  ggplot(d2, aes (x=prob, right ) ) +
-    geom_col()
-  d3 <- map(c(0.7,0.5,0), ~ cum_correct(.x) ) |>
-    list_rbind()
-  ggplot(d3, aes (x=prob, right ) ) +
-    geom_col()
-
 })
+  cum_correct <- function(p) {
+    results |> filter(prob >= p) |>
+      summarise(prob = p,
+                covered = n(),
+                right = sum(correct),
+                wrong = covered - right,
+                accuracy = mean(correct),
+                coverage = covered/length(results[[1]]),
+                discovery_rate = right/length(results[[1]]) )
+  }
+  d2 <- map(seq(from=.01 ,to = .99, length.out = 200), ~ cum_correct(.x) ) |>
+    list_rbind()
+  ggplot(d2, aes (x=prob ) ) +
+    geom_line( aes(y=discovery_rate), color = "blue") +
+    geom_line( aes(y=coverage), color = "green") +
+    geom_line( aes(y=accuracy), color = "red") +
+    labs(title="Performance against probability cut-off") +
+    theme(legend.position = "bottom")
+
+  ggplot(d2, aes (x=accuracy ) ) +
+    geom_line( aes(y=discovery_rate), color = "blue") +
+    geom_line( aes(y=coverage), color = "green") +
+    labs(title="Discovery rate and coverage vs accuracy")
 
 hiprob_misses <- results |> filter(prob > 0.94, correct==FALSE )
+midprob_misses <- results |> filter(prob > 0.7, correct==FALSE )
+midprob_quantile <- results |> filter(prob > 0.7, correct==FALSE ) |>
+  summarise(rows = n(), hits = sum(correct))
 loprob_misses <- results |> filter(prob < 0.5, correct==FALSE )
 loprob_all <- results |> filter(prob < 0.5)
