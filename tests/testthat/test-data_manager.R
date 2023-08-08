@@ -4,9 +4,19 @@ library(usethis)
 
 # use_r()
 
+
+file_list <- function(){
+  base_path <- "../not_in_repo"
+  list.files(base_path) |>
+    map_chr( \(x) file.path(base_path, x))
+}
+
+
+
+
 test_that("Reads transactions from test file", {
-  source_file <- "../not_in_repo/Accounting_20230731.xlsm"
-#  source_file <- "../../../not_in_repo/Accounting_20230731.xlsm"
+  source_file <- file_list()[str_detect(file_list(), "0803")]
+#  source_file <- file_list()[str_detect(file_list(), "0516")]
   df <- load_wb_data(source_file)
   txns <<- get_source_txns(df)
   expect_gt(length(txns$train$Date), 1000)
@@ -48,24 +58,14 @@ test_that("Predict from test data ",{
              "Prediction accuracy")
 })
 test_that("Build results table",{
-  results <<- make_results_table (test, pred)
+  results_table <<- make_results_table (test, pred)
   ggplot(results, aes(x=prob, fill=correct) ) +
     geom_histogram(bins=9) +
     coord_cartesian(xlim=c(0.5,1), ylim=c(0, length(results$prob)))
 })
-  cum_correct <- function(p) {
-    results |> filter(prob >= p) |>
-      summarise(prob = p,
-                covered = n(),
-                right = sum(correct),
-                wrong = covered - right,
-                accuracy = mean(correct),
-                coverage = covered/length(results[[1]]),
-                discovery_rate = right/length(results[[1]]) )
-  }
-  d2 <- map(seq(from=.01 ,to = .99, length.out = 200), ~ cum_correct(.x) ) |>
-    list_rbind()
-  ggplot(d2, aes (x=prob ) ) +
+results_perf <- make_performance_table (results)
+
+  ggplot(results_ana, aes (x=prob ) ) +
     geom_line( aes(y=discovery_rate), color = "blue") +
     geom_line( aes(y=coverage), color = "green") +
     geom_line( aes(y=accuracy), color = "red") +
@@ -77,9 +77,14 @@ test_that("Build results table",{
     geom_line( aes(y=coverage), color = "green") +
     labs(title="Discovery rate and coverage vs accuracy")
 
+
 hiprob_misses <- results |> filter(prob > 0.94, correct==FALSE )
-midprob_misses <- results |> filter(prob > 0.7, correct==FALSE )
+midprob_misses <- results |> filter(prob > 0.7, prob<0.94,   correct==FALSE )
 midprob_quantile <- results |> filter(prob > 0.7, correct==FALSE ) |>
   summarise(rows = n(), hits = sum(correct))
 loprob_misses <- results |> filter(prob < 0.5, correct==FALSE )
 loprob_all <- results |> filter(prob < 0.5)
+
+source_files <- file_list()[str_detect(file_list(), "Accounting")]
+measure <- build_measure_model(source_files[1])
+file_versions_measures <- map(source_files, ~ build_measure_model(.x))
