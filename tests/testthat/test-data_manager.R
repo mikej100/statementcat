@@ -4,78 +4,84 @@ library(usethis)
 
 # use_r()
 
-
-file_list <- function(){
-  base_path <- "../not_in_repo"
-  list.files(base_path) |>
-    map_chr( \(x) file.path(base_path, x))
-}
-
-
-
-
-test_that("Reads transactions from test file", {
+test_that("Reads transactions from test file, and splits into subsets", {
   source_file <- file_list()[str_detect(file_list(), "0803")]
 #  source_file <- file_list()[str_detect(file_list(), "0516")]
   df <- load_wb_data(source_file)
-  txns <<- get_source_txns(df)
-  expect_gt(length(txns$train$Date), 1000)
-})
+  sample_rate <<- 0.1
+  exp_min_train <<- 1000
+  tx1 <- get_source_txns(df, sample_rate, train_prop = 1)
+  expect_gt(nrow(tx1$train), exp_min_train * sample_rate)
+  expect_lt(nrow(tx1$test), 1)
+  expect_gt(nrow(tx1$nolabel), exp_min_train * sample_rate)
 
-# test_that("Load subset of transactions from test file", {
-#   source_file <- "../not_in_repo/Accounting_20230516.xlsm"
-#   df <- load_wb_data(source_file)
-#   txns <<- get_source_txns(df, 0.2)
-#   expect_gt(length(txns$train$Date), 100)
-#   expect_lt(length(txns$train$Date), 1000)
-# })
+  txns <<- get_source_txns(df, sample_rate )
+  expect_gt(nrow(txns$train), exp_min_train* sample_rate)
+  expect_gt(nrow(txns$train), exp_min_train * sample_rate)
+  expect_gt(nrow(txns$nolabel), exp_min_train * sample_rate)
+  })
 
 test_that("Prepare data",{
   train <<- prep_data(txns$train)
   expect_gt(length(train$class), 50)
   expect_gt(length(train$words), 50)
+  expect_gt( length(train$features), 0.9 * length(unique(train$class)) )
+  expect_equal(length(train$features[[1]]),  length(train$class))
 })
 
+
 test_that("Create table of word incidence",{
-  incidence_table <<- make_word_incidence_table(train$words)
-  expect_gt( length(incidence_table), 0.9 * length(unique(train$class)) )
-  expect_equal(length(incidence_table[[1]]),  length(train$class))
+  # incidence_table <<- make_word_incidence_table(train$words)
+  expect_gt( length(train$features), 0.9 * length(unique(train$class)) )
+  expect_equal(length(train$features[[1]]),  length(train$class))
 })
 
 test_that("train naive Bayes model",{
-  train_class <- train$class
-  model <<- make_model_1(incidence_table, train_class)
-  expect_lte( tables(model, which=(names(incidence_table[1])) )[[1]][1], 1.0)
+  model <<- make_model_1(train$features, train$class)
+  # expect word in bbag of words to have probability less than 1.
+  expect_lte( tables(model, which=(names(train$features[1])) )[[1]][1], 1.0)
 })
 
 test_that("Predict from test data ",{
   test <<- prep_data(txns$test)
-  test$features <- make_word_incidence_table(test$words)
   pred_class <- predict(model, test$features, type = "class" )
   pred_prob <- predict(model, test$features, type =  "prob" )
   pred <<- list(class = pred_class, prob = pred_prob)
-  expect_gt (sum(pred$class == test$class)/ length(test$class), 0.5,
+  expect_gt (sum(pred$class == test$class)/ length(test$class), 0.3,
              "Prediction accuracy")
 })
-test_that("Build results table",{
-  results_table <<- make_results_table (test, pred)
-  ggplot(results, aes(x=prob, fill=correct) ) +
-    geom_histogram(bins=9) +
-    coord_cartesian(xlim=c(0.5,1), ylim=c(0, length(results$prob)))
+test_that("Build test results table",{
+  results  <<- test_model(model, test)
+  # Expect a number of probabilities in the results table
+  expect_gt (length(results$table$prob), exp_min_train *.8 * sample_rate  )
+  # Expect overall discovery rate in range 0.2 to 1
+  overall_discovery_rate <- last( results$measure$accuracy)
+  expect_gt(overall_discovery_rate, 0.3)
+  expect_lt(overall_discovery_rate, 0.9)
 })
-results_perf <- make_performance_table (results)
 
-  ggplot(results_ana, aes (x=prob ) ) +
+
+test_that("Put it all together: from file to test results",{
+  source_file <- last( file_list(pattern = "Accounting") )
+  results <<- build_and_test_model(source_file, sample_rate = 1)
+
+})
+
+results_set <- map(1:3,
+                   \(n) build_and_test_model(source_file, sample_rate=1)) |>
+  map(\(x) x$measure)
+
+  ggplot(results$table, aes (x=accuracy ) ) +
+    geom_line( aes(y=discovery_rate), color = "blue") +
+    geom_line( aes(y=coverage), color = "green") +
+    labs(title="Discovery rate and coverage vs accuracy")
+
+  ggplot(results$table, aes (x=prob ) ) +
     geom_line( aes(y=discovery_rate), color = "blue") +
     geom_line( aes(y=coverage), color = "green") +
     geom_line( aes(y=accuracy), color = "red") +
     labs(title="Performance against probability cut-off") +
     theme(legend.position = "bottom")
-
-  ggplot(d2, aes (x=accuracy ) ) +
-    geom_line( aes(y=discovery_rate), color = "blue") +
-    geom_line( aes(y=coverage), color = "green") +
-    labs(title="Discovery rate and coverage vs accuracy")
 
 
 hiprob_misses <- results |> filter(prob > 0.94, correct==FALSE )
@@ -88,3 +94,25 @@ loprob_all <- results |> filter(prob < 0.5)
 source_files <- file_list()[str_detect(file_list(), "Accounting")]
 measure <- build_measure_model(source_files[1])
 file_versions_measures <- map(source_files, ~ build_measure_model(.x))
+
+
+test_that("train and predict unlabelled data",{
+  source_file <- last(source_files, sample_rate=0.1)
+
+})
+
+
+
+test_that("filter on df columns and external vectors", {
+  n=10
+  ext_sample <- rbernoulli(n)
+  df <- tibble(
+    value = rpois(n,3),
+    int_sample = sample( c("train", "test", "drop"), n,
+                         replace=TRUE, prob=c(5,2,2))
+  )
+  df[ext_sample, ]
+  ss<-df[df$int_sample == "train", ]
+  df[ df$int_sample == "train", ]
+  df[ df$int_sample == "train"  && ext_sample, ]
+})

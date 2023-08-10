@@ -6,9 +6,14 @@ library(stringr)
 library(tidyr)
 library(usethis)
 
-# use_test()
+ use_test()
 
-
+# List files in the data folder held outside the repository.
+file_list <- function(pattern=".*\\.xls[mx]"){
+  base_path <- "../not_in_repo/data"
+  list.files(base_path, pattern = pattern) |>
+    map_chr( \(x) file.path(base_path, x))
+}
 
 load_wb_data <- function (filepath){
   tx_raw <- read.xlsx(
@@ -17,34 +22,39 @@ load_wb_data <- function (filepath){
   )
 }
 
-get_source_txns <- function (txns_raw, sample_rate=1.0){
-  train_prop = 0.8
+# From raw spreadsheet transactions set up source data and split into
+# test, train and unlabelled subsets
+# sample_rate can be used to get a randomised subset
+get_source_txns <- function (txns_raw,
+                             sample_rate=1.0, train_prop=0.8){
   tx1 <- txns_raw |>
-    mutate(row = 2:(length(txns_raw[[1]]) + 1) ) |>
+    mutate(row = 2:(nrow(txns_raw) + 1))  |>
     filter(Account == 2102) |>
-    filter(!is.na(Category)) |>
-    select(row, Date, Amount, Description, Type, Category)
+    mutate(nolabel = is.na(Category) | is.na(Type) ) |>
+    select(row, Date, Amount, Description, Type, Category, nolabel)
 
-  set.seed(2)
+  set.seed(NULL)
   buckets <- c("train", "test", "drop")
-  sample <- sample( buckets, nrow(txns_raw), replace=TRUE,
+  sample <- sample( buckets, nrow(tx1), replace=TRUE,
                     prob=c( sample_rate * train_prop,
                             sample_rate * (1 - train_prop),
                             1 - sample_rate
                     ))
 
   source_txn <- list (
-    "train"  = tx1[sample=="train", ],
-    "test" = tx1[sample=="test", ]
+    "train" = tx1[ !tx1$nolabel & sample == "train", ],
+    "test" = tx1[ !tx1$nolabel & sample == "test", ],
+    "nolabel" = tx1[ tx1$nolabel & sample != "drop",  ]
   )
 }
 
 prep_data <- function (raw) {
-  raw |>
-    drop_na(Type, Category) |>
+  prep <-  raw |>
     mutate(class = paste(Type, Category, sep = "-"))  |>
     mutate(words = str_split(str_squish(Description), " "))
 
+  prep$features <- make_word_incidence_table(prep$words)
+  return(prep)
 }
 
 make_word_incidence_table <- function (words) {
@@ -60,11 +70,13 @@ make_word_incidence_table <- function (words) {
     as_tibble()
 }
 
-make_model_1 <- function (features, class) {
-  model <- naive_bayes(x = features, y = class, laplace = 1)
+make_model_1 <- function (training_data) {
+  model <- naive_bayes(x = training_data$features,
+                       y = training_data$class, laplace = 1)
 }
+
 # Tabulate results of predictionss vs actuals, row in original table
-make_results_table <- function(test, pred) {
+make_test_results_table <- function(test, pred) {
    table <- tibble(
      row = test$row,
      actual = test$class,
@@ -74,8 +86,9 @@ make_results_table <- function(test, pred) {
      description = test$Description
    )
 }
+
 # Calculate cumulative performance stats for a given probability p.
-cum_results <- function(res, p) {
+cum_test_results <- function(res, p) {
   res |>
     filter(prob >= p) |>
     summarise(prob = p,
@@ -87,15 +100,25 @@ cum_results <- function(res, p) {
               discovery_rate = right/length(res[[1]])
             )
 }
+
 # Make table for model performance for range of probabilities.
 make_performance_table <- function(res) {
-  map(seq(from=.01 ,to = .99, length.out = 100), ~ cum_results(res, .x) ) |>
+  map(seq(from=.01 ,to = .99, length.out = 100), ~ cum_test_results(res, .x)) |>
     list_rbind()
 }
-# Extract key performance measures. For two accuracy levels give discovery and
+
+# 'Extract key performance measures
+# 'For two accuracy levels and the overall accuracy, give discovery and
 # coverage rate.
+#'
+#' @param perf_table
+#'
+#' @return
+#' @export
+#'
+#' @examples
 get_perf_measures <- function (perf_table) {
-  accuracy_breakpoints <- c(0.9, 0.8)
+  accuracy_breakpoints <- c(0.9, 0.8, first(perf_table$accuracy))
   perf_measures <- list(
     accuracy = accuracy_breakpoints,
     discovery = (approx(x = perf_table$accuracy,
@@ -108,22 +131,39 @@ get_perf_measures <- function (perf_table) {
   return(perf_measures)
 }
 
-build_measure_model <- function(source_file){
+#===================
+# Functions which compose function steps.
+
+# Build and test model for givem source file
+build_and_test_model <- function(source_file, sample_rate=1.0){
   txns <- load_wb_data(source_file) |>
-    get_source_txns()
+    get_source_txns(sample_rate)
+  model <- make_model(txns$train)
+  perf <- test_model(model, txns$test)
+}
+make_model <- function(txn) {
+  txn |>
+    prep_data() |>
+    make_model_1()
+}
 
-  train <- prep_data(txns$train)
-  train$features <- make_word_incidence_table(train$words)
-  model <- make_model_1(train$features, train$class)
 
-  test <- prep_data(txns$test)
-  test$features <- make_word_incidence_table(test$words)
+#' Test the model
+#'
+#' @param model
+#' @param txn Test features and classes
+#'
+#' @return List: table of test detailed test results; summary stats
+#' @export
+#'
+#' @examples
+test_model <-function(model, txn) {
+  test <- prep_data(txn)
   pred_class <- predict(model, test$features, type = "class" )
   pred_prob <- predict(model, test$features, type =  "prob" )
   pred <- list(class = pred_class, prob = pred_prob)
-
-  results_table <- make_results_table (test, pred)
+  results_table <- make_test_results_table (test, pred)
   performance_table <- make_performance_table (results_table)
   performance_measure <- get_perf_measures(performance_table)
-  return (performance_measure)
+  performance <- list(table = performance_table, measure = performance_measure)
 }
