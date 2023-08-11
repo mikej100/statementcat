@@ -1,4 +1,4 @@
-library(dplyr)
+library(tidyverse)
 library(naivebayes)
 library(openxlsx)
 library(purrr)
@@ -7,6 +7,43 @@ library(tidyr)
 library(usethis)
 
  use_test()
+
+ generate_synthetic_data N<- function (filename) {
+   base_path <- "./data"
+   n = 20
+
+   date <- sample( seq(as.Date('2022/01/01'), as.Date('2023/06/01'),by="day"), n)
+
+   text <- c("WATFORD OXFORD LONDON BARNSTABLE LLOYDS PAYPAL SANTANDER
+   GROSNI BARRACUDA NEW YORK RESTAURANT BAR CAFE HOTEL Finch Buzzard AS AN BE GF
+   GREAT SMALL MID OVER UNDER BLUE GREY RED GREEN BEIGE MAROON TAU MUON SPINOR
+   PAULI ERENFEST NOETHER SOMMERVILLE LOVELACE")
+   words <- str_split_1( str_squish(text) , pattern = " ")
+   word_count <- rpois(n,3) + 1
+   description <- map_chr(
+     word_count,
+     \(wc) str_flatten(sample(words, wc , replace = T), collapse = " ")
+     )
+
+   amount <- rchisq(n, 2) * 10
+
+   types  <- c("Monthly", "Annual")
+   type_prob <- c(3, 1)
+   type = sample( types, n, p = type_prob, replace = T)
+
+   categories <- c("Bills", "Trips", "Domestic", "Groceries")
+   cat_prob <- c(1, 1, 2, 3)
+   category <- sample(categories, n, cat_prob, replace=T )
+
+   synth_df <- tibble(
+     Date = date,
+     Description = description,
+     Amount = amount,
+     Type = type,
+     Category = category
+   )
+
+   Amount <- rchisq(n, )
 
 # List files in the data folder held outside the repository.
 file_list <- function(pattern=".*\\.xls[mx]"){
