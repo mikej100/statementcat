@@ -4,8 +4,12 @@ library(usethis)
 
 # use_r()
 
+test_that("Create synthetic data", {
+
+} )
+
 test_that("Reads transactions from test file, and splits into subsets", {
-  source_file <- file_list()[str_detect(file_list(), "0803")]
+  source_file <- file_list("../not_in_repo/data",  "0803")
 #  source_file <- file_list()[str_detect(file_list(), "0516")]
   df <- load_wb_data(source_file)
   sample_rate <<- 0.1

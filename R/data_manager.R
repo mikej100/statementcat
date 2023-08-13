@@ -8,9 +8,9 @@ library(usethis)
 
  use_test()
 
- generate_synthetic_data N<- function (filename) {
-   base_path <- "./data"
-   n = 20
+ generate_synthetic_data <- function (filename) {
+   dir_path <- "./data"
+   n = 4000
 
    date <- sample( seq(as.Date('2022/01/01'), as.Date('2023/06/01'),by="day"), n)
 
@@ -43,13 +43,21 @@ library(usethis)
      Category = category
    )
 
-   Amount <- rchisq(n, )
+   result <- write.xlsx(
+     synth_df,
+     file.path(dir_path, filename),
+     overwrite = TRUE,
+     sheetName = "Txns"
+   )
 
-# List files in the data folder held outside the repository.
-file_list <- function(pattern=".*\\.xls[mx]"){
-  base_path <- "../not_in_repo/data"
-  list.files(base_path, pattern = pattern) |>
-    map_chr( \(x) file.path(base_path, x))
+
+ }
+
+
+# List files paths in the data folder held outside the repository.
+file_list <- function(dir_path="./data", pattern=".*\\.xls[mx]"){
+  list.files(dir_path, pattern = pattern) |>
+    map_chr( \(x) file.path(dir_path, x))
 }
 
 load_wb_data <- function (filepath){
