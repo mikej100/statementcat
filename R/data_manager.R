@@ -8,50 +8,59 @@ library(usethis)
 
  use_test()
 
- generate_synthetic_data <- function (filename) {
-   dir_path <- "./data"
-   n = 4000
+generate_synthetic_data <- function (filename) {
+  dir_path <- "./data"
+  n = 4000
+  no_label_rate = 0.3
 
-   date <- sample( seq(as.Date('2022/01/01'), as.Date('2023/06/01'),by="day"), n)
+  account <- rep("2102", n)
 
-   text <- c("WATFORD OXFORD LONDON BARNSTABLE LLOYDS PAYPAL SANTANDER
-   GROSNI BARRACUDA NEW YORK RESTAURANT BAR CAFE HOTEL Finch Buzzard AS AN BE GF
-   GREAT SMALL MID OVER UNDER BLUE GREY RED GREEN BEIGE MAROON TAU MUON SPINOR
-   PAULI ERENFEST NOETHER SOMMERVILLE LOVELACE")
-   words <- str_split_1( str_squish(text) , pattern = " ")
-   word_count <- rpois(n,3) + 1
-   description <- map_chr(
-     word_count,
-     \(wc) str_flatten(sample(words, wc , replace = T), collapse = " ")
-     )
+  date <- sample( seq(as.Date('2022/01/01'), as.Date('2023/06/01'),by="day"),
+                  n, replace=TRUE)
 
-   amount <- rchisq(n, 2) * 10
+  text <- c("WATFORD OXFORD LONDON BARNSTABLE LLOYDS PAYPAL SANTANDER
+  GROSNI BARRACUDA NEW YORK RESTAURANT BAR CAFE HOTEL Finch Buzzard AS AN BE GF
+  GREAT SMALL MID OVER UNDER BLUE GREY RED GREEN BEIGE MAROON TAU MUON SPINOR
+  PAULI ERENFEST NOETHER SOMMERVILLE LOVELACE")
+  words <- str_split_1( str_squish(text) , pattern = " ")
+  word_count <- rpois(n,3) + 1
+  description <- map_chr(
+    word_count,
+    \(wc) str_flatten(sample(words, wc , replace = T), collapse = " ")
+    )
 
-   types  <- c("Monthly", "Annual")
-   type_prob <- c(3, 1)
-   type = sample( types, n, p = type_prob, replace = T)
+  amount <- rchisq(n, 2) * 10
 
-   categories <- c("Bills", "Trips", "Domestic", "Groceries")
-   cat_prob <- c(1, 1, 2, 3)
-   category <- sample(categories, n, cat_prob, replace=T )
+  types  <- c("Monthly", "Annual")
+  type_prob <- c(3, 1)
+  type = sample( types, n, p = type_prob, replace = T)
 
-   synth_df <- tibble(
-     Date = date,
-     Description = description,
-     Amount = amount,
-     Type = type,
-     Category = category
-   )
+  categories <- c("Bills", "Trips", "Domestic", "Groceries")
+  cat_prob <- c(1, 1, 2, 3)
+  category <- sample(categories, n, cat_prob, replace=T )
 
-   result <- write.xlsx(
-     synth_df,
-     file.path(dir_path, filename),
-     overwrite = TRUE,
-     sheetName = "Txns"
-   )
+  synth_df <- tibble(
+    Account = account,
+    Date = date,
+    Description = description,
+    Amount = amount,
+    Type = type,
+    Category = category
+  )
+
+  mask <- sample(1:n, n * no_label_rate,)
+  synth_df$Type[mask] = NA
+  synth_df$Category[mask] = NA
+
+  result <- write.xlsx(
+    synth_df,
+    file.path(dir_path, filename),
+    overwrite = TRUE,
+    sheetName = "Txns"
+  )
 
 
- }
+}
 
 
 # List files paths in the data folder held outside the repository.

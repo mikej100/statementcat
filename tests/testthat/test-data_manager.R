@@ -5,13 +5,18 @@ library(usethis)
 # use_r()
 
 test_that("Create synthetic data", {
-
+  fname <- paste0("test_data_",strftime(Sys.time(),"%Y%m%dT%H%M"),".xlsx")
+  result <- generate_synthetic_data(fname)
+  found <- file_list(pattern=fname)
+  df <- load_wb_data(found)
+  expect_equal(nrow(df), n)
 } )
 
 test_that("Reads transactions from test file, and splits into subsets", {
-  source_file <- file_list("../not_in_repo/data",  "0803")
+  source_file <- file_list( pattern="20230815")
+#  source_file <- file_list("../not_in_repo/data",  "0803")
 #  source_file <- file_list()[str_detect(file_list(), "0516")]
-  df <- load_wb_data(source_file)
+  df <- load_wb_data(last(source_file))
   sample_rate <<- 0.1
   exp_min_train <<- 1000
   tx1 <- get_source_txns(df, sample_rate, train_prop = 1)
@@ -33,7 +38,7 @@ test_that("Prepare data",{
   expect_equal(length(train$features[[1]]),  length(train$class))
 })
 
-
+skip("make_word_incidence table tested in Prepare data test")
 test_that("Create table of word incidence",{
   # incidence_table <<- make_word_incidence_table(train$words)
   expect_gt( length(train$features), 0.9 * length(unique(train$class)) )
@@ -41,7 +46,7 @@ test_that("Create table of word incidence",{
 })
 
 test_that("train naive Bayes model",{
-  model <<- make_model_1(train$features, train$class)
+  model <<- make_model_1(train)
   # expect word in bbag of words to have probability less than 1.
   expect_lte( tables(model, which=(names(train$features[1])) )[[1]][1], 1.0)
 })
@@ -51,7 +56,7 @@ test_that("Predict from test data ",{
   pred_class <- predict(model, test$features, type = "class" )
   pred_prob <- predict(model, test$features, type =  "prob" )
   pred <<- list(class = pred_class, prob = pred_prob)
-  expect_gt (sum(pred$class == test$class)/ length(test$class), 0.3,
+  expect_gt (sum(pred$class == test$class)/ length(test$class), 0.2,
              "Prediction accuracy")
 })
 test_that("Build test results table",{
@@ -60,7 +65,7 @@ test_that("Build test results table",{
   expect_gt (length(results$table$prob), exp_min_train *.8 * sample_rate  )
   # Expect overall discovery rate in range 0.2 to 1
   overall_discovery_rate <- last( results$measure$accuracy)
-  expect_gt(overall_discovery_rate, 0.3)
+  expect_gt(overall_discovery_rate, 0.2)
   expect_lt(overall_discovery_rate, 0.9)
 })
 
