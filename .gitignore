@@ -2,3 +2,5 @@
 .Rhistory
 .RData
 .Ruserdata
+log/
+test/testthat/temp_dir/

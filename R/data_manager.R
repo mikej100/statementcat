@@ -1,17 +1,15 @@
 library(tidyverse)
 library(naivebayes)
 library(openxlsx)
-library(purrr)
-library(stringr)
-library(tidyr)
 library(usethis)
 
- use_test()
+ #use_test()
 
-generate_synthetic_data <- function (filename) {
-  dir_path <- "./data"
+generate_synthetic_data <- function (filepath) {
+  # dir_path <- system.file("data", package="statementcat")
   n = 4000
   no_label_rate = 0.3
+  log_info("generate_sythentic_data function, filepath: {filepath}")
 
   account <- rep("2102", n)
 
@@ -54,7 +52,7 @@ generate_synthetic_data <- function (filename) {
 
   result <- write.xlsx(
     synth_df,
-    file.path(dir_path, filename),
+    filepath,
     overwrite = TRUE,
     sheetName = "Txns"
   )
@@ -64,7 +62,11 @@ generate_synthetic_data <- function (filename) {
 
 
 # List files paths in the data folder held outside the repository.
-file_list <- function(dir_path="./data", pattern=".*\\.xls[mx]"){
+file_list <- function(
+    dir_path="./data",
+    # dir_path=system.file("data", package="statementcat"),
+    pattern=".*\\.xls[mx]"
+    ){
   list.files(dir_path, pattern = pattern) |>
     map_chr( \(x) file.path(dir_path, x))
 }
