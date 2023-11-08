@@ -64,30 +64,43 @@ generate_synthetic_data <- function (filepath) {
 # List files paths in the data folder held outside the repository.
 file_list <- function(
     dir_path="./data",
-    # dir_path=system.file("data", package="statementcat"),
     pattern=".*\\.xls[mx]"
     ){
   list.files(dir_path, pattern = pattern) |>
     map_chr( \(x) file.path(dir_path, x))
 }
 
-load_wb_data <- function (filepath){
+# From raw spreadsheet transactions set up source data and split into
+# test, train and unlabelled subsets
+# sample_rate can be used to get a randomised subset
+#' From raw spreadsheet, set up test, train and unlablled subsets
+#'
+#' @param txns_raw dataframe of transactions as read from spreadsheet
+#' @param since Date since which transactions are retained "yyyy-mm-dd"
+#' @param sample_rate Proportion of transactions to include, 1 to use all
+#' @param train_prop Proportion of transations to use in training set
+#'
+#' @return list of three lists of transactions $train, $test, $nolabel
+#' @export
+#'
+#' @examples datasets <- get_source_txs (txns_raw, since="2019-04-01" )
+get_source_txns <- function (filepath,
+                             since = "2022-04-01",
+                             sample_rate=1.0,
+                             train_prop=0.8){
+  log_info("Source file: {filepath}")
+
   tx_raw <- read.xlsx(
     filepath,
     sheet = "Txns"
   )
-}
-
-# From raw spreadsheet transactions set up source data and split into
-# test, train and unlabelled subsets
-# sample_rate can be used to get a randomised subset
-get_source_txns <- function (txns_raw,
-                             sample_rate=1.0, train_prop=0.8){
-  tx1 <- txns_raw |>
-    mutate(row = 2:(nrow(txns_raw) + 1))  |>
+  tx1 <- tx_raw |>
+    mutate(row = 2:(nrow(tx_raw) + 1))  |>
     filter(Account == 2102) |>
+    mutate(rdate = convertToDate(Date)) |>
+    filter(rdate >= as.Date(since)) |>
     mutate(nolabel = is.na(Category) | is.na(Type) ) |>
-    select(row, Date, Amount, Description, Type, Category, nolabel)
+    select(row, rdate, Amount, Description, Type, Category, nolabel)
 
   set.seed(NULL)
   buckets <- c("train", "test", "drop")
@@ -104,18 +117,18 @@ get_source_txns <- function (txns_raw,
   )
 }
 
-prep_data <- function (raw) {
+prep_data <- function (raw, word_length = 2) {
   prep <-  raw |>
     mutate(class = paste(Type, Category, sep = "-"))  |>
     mutate(words = str_split(str_squish(Description), " "))
 
-  prep$features <- make_word_incidence_table(prep$words)
+  prep$features <- make_word_incidence_table(prep$words, word_length)
   return(prep)
 }
 
-make_word_incidence_table <- function (words) {
+make_word_incidence_table <- function (words, word_length) {
   word_list <- unique(unlist(words)) |>
-    keep( \(w) str_length(w) > 0)
+    keep( \(w) str_length(w) > word_length - 1)
 
   target_in_words <- function(target, fwords) {
     map_lgl(fwords, \(ws) target %in% ws )
@@ -126,100 +139,14 @@ make_word_incidence_table <- function (words) {
     as_tibble()
 }
 
-make_model_1 <- function (training_data) {
-  model <- naive_bayes(x = training_data$features,
-                       y = training_data$class, laplace = 1)
-}
+write_predictions <- function(filepath, predictions) {
+  pred_expanded <- tibble(row = seq(2, last(predictions)$row)) |>
+    left_join(predictions) |>
+    select( !row)
 
-# Tabulate results of predictionss vs actuals, row in original table
-make_test_results_table <- function(test, pred) {
-   table <- tibble(
-     row = test$row,
-     actual = test$class,
-     predicted = pred$class,
-     correct = actual == predicted ,
-     prob = imap_dbl(pred$class, \(c,i) pred$prob[i,c]),
-     description = test$Description
-   )
-}
-
-# Calculate cumulative performance stats for a given probability p.
-cum_test_results <- function(res, p) {
-  res |>
-    filter(prob >= p) |>
-    summarise(prob = p,
-              covered = n(),
-              right = sum(correct),
-              wrong = covered - right,
-              accuracy = mean(correct),
-              coverage = covered/length(res[[1]]),
-              discovery_rate = right/length(res[[1]])
-            )
-}
-
-# Make table for model performance for range of probabilities.
-make_performance_table <- function(res) {
-  map(seq(from=.01 ,to = .99, length.out = 100), ~ cum_test_results(res, .x)) |>
-    list_rbind()
-}
-
-# 'Extract key performance measures
-# 'For two accuracy levels and the overall accuracy, give discovery and
-# coverage rate.
-#'
-#' @param perf_table
-#'
-#' @return
-#' @export
-#'
-#' @examples
-get_perf_measures <- function (perf_table) {
-  accuracy_breakpoints <- c(0.9, 0.8, first(perf_table$accuracy))
-  perf_measures <- list(
-    accuracy = accuracy_breakpoints,
-    discovery = (approx(x = perf_table$accuracy,
-                 y = perf_table$discovery_rate,
-                 xout = accuracy_breakpoints) )[[2]],
-    coverage = (approx(x = perf_table$accuracy,
-                 y = perf_table$coverage,
-                 xout = accuracy_breakpoints) )[[2]]
-  )
-  return(perf_measures)
-}
-
-#===================
-# Functions which compose function steps.
-
-# Build and test model for givem source file
-build_and_test_model <- function(source_file, sample_rate=1.0){
-  txns <- load_wb_data(source_file) |>
-    get_source_txns(sample_rate)
-  model <- make_model(txns$train)
-  perf <- test_model(model, txns$test)
-}
-make_model <- function(txn) {
-  txn |>
-    prep_data() |>
-    make_model_1()
-}
-
-
-#' Test the model
-#'
-#' @param model
-#' @param txn Test features and classes
-#'
-#' @return List: table of test detailed test results; summary stats
-#' @export
-#'
-#' @examples
-test_model <-function(model, txn) {
-  test <- prep_data(txn)
-  pred_class <- predict(model, test$features, type = "class" )
-  pred_prob <- predict(model, test$features, type =  "prob" )
-  pred <- list(class = pred_class, prob = pred_prob)
-  results_table <- make_test_results_table (test, pred)
-  performance_table <- make_performance_table (results_table)
-  performance_measure <- get_perf_measures(performance_table)
-  performance <- list(table = performance_table, measure = performance_measure)
+  wb <- loadWorkbook(filepath)
+  writeData(wb, sheet="Txns", x=pred_expanded,
+            startCol = 10, startRow = 2, keepNA = FALSE,
+            colNames = FALSE)
+  saveWorkbook(wb, filepath, overwrite = TRUE)
 }
