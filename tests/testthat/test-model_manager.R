@@ -41,14 +41,10 @@ test_that("train and predict with all labelled data",{
   plot_results_by_prob(perf)
 })
 
-wrongungs <- perf$results_table |>
-  filter(correct == FALSE) |>
-  filter(prob >= 0.5)
-
 test_that("train and test predict with labelled data",{
   source_file <-  last( file_list("../not_in_repo/data", pattern="0930") )
   txns <<- get_source_txns(source_file, sample_rate=1, train_prop = 0.8)
-  word_length <- 1
+  word_length <- 4
   train <<- prep_data(txns$train, word_length = word_length)
   test <<- prep_data(txns$test, word_length = word_length)
   model <<- make_model_1(train, laplace = 0.1)
@@ -98,13 +94,17 @@ laplace_table <- tibble(laplace, acc_overall)
   )
 
 test_that("train and test predict  unlabelled data",{
-  source_file <-  last( file_list("../not_in_repo/data", pattern="0930") )
+  source_folder <- Sys.getenv("StatementcatTxFolder")
+  source_file <- last( file_list(source_folder,  "1108") )
   txns <- get_source_txns(source_file, sample_rate=1, train_prop = 1)
   word_length <- 4
   train <- prep_data(txns$train, word_length = word_length)
   predict <- prep_data(txns$nolabel, word_length = word_length)
   model <- make_model_1(train, laplace = 0.1)
-  pred <- make_predictions(model, predict)
+  predictions <<- make_predictions(model, predict)
+
+  write_predictions(source_file, predictions)
+
 })
 
 

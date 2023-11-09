@@ -33,7 +33,6 @@ test_that("Reads transactions from transactions file, and splits into subsets", 
   } else {
     source_file <- last( file_list("../not_in_repo/data",  "0930") )
   }
-
   sample_rate <<- 1
   train_prop <<- 1
   exp_min_train <<- 999
@@ -54,6 +53,12 @@ test_that("Prepare data",{
   expect_gt(length(train$words), 50)
   expect_gt( length(train$features), 0.9 * length(unique(train$class)) )
   expect_equal(length(train$features[[1]]),  length(train$class))
+})
+
+test_that("Write predictions to Accounting file", {
+  source_folder <- Sys.getenv("StatementcatTxFolder")
+  source_file <- last( file_list(source_folder,  "1108") )
+
 })
 
 

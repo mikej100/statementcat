@@ -140,13 +140,20 @@ make_word_incidence_table <- function (words, word_length) {
 }
 
 write_predictions <- function(filepath, predictions) {
-  pred_expanded <- tibble(row = seq(2, last(predictions)$row)) |>
-    left_join(predictions) |>
-    select( !row)
+  predictions1 <- predictions |>
+    mutate(Type = str_extract(pred_class, "[^-]+")) |>
+    mutate(Category = str_extract(pred_class, "-(.+)", group = 1 )) |>
+    select(Type, Category, pred_prob)
+
+  # pred_expanded <- tibble(row = seq(2, last(predictions)$row)) |>
+  #   left_join(predictions) |>
+  #   select( !row)
 
   wb <- loadWorkbook(filepath)
-  writeData(wb, sheet="Txns", x=pred_expanded,
-            startCol = 10, startRow = 2, keepNA = FALSE,
-            colNames = FALSE)
+  for( i in seq_along(predictions$row)) {
+    writeData(wb, sheet="Txns", x = predictions1[i,],
+              startCol = 6, startRow = predictions$row[[i]], keepNA = FALSE,
+              colNames = FALSE)
+  }
   saveWorkbook(wb, filepath, overwrite = TRUE)
 }

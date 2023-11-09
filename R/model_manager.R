@@ -148,4 +148,3 @@ plot_results_by_prob <- function(results, subtitle="") {
     theme(legend.position = "bottom")
 }
 
-ggplot()
