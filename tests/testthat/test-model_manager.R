@@ -4,6 +4,9 @@ library(logger)
 library(testthat)
 library(usethis)
 
+source("R/data_manager.R")
+source("R/model_manager.R")
+
 log_appender(appender_file(test_path("../../log/log.txt")))
 testflag_synth_data <- FALSE
 
@@ -95,7 +98,7 @@ laplace_table <- tibble(laplace, acc_overall)
 
 test_that("train and test predict  unlabelled data",{
   source_folder <- Sys.getenv("StatementcatTxFolder")
-  source_file <- last( file_list(source_folder,  "1108") )
+  source_file <- last( file_list(source_folder,  "0221") )
   txns <- get_source_txns(source_file, sample_rate=1, train_prop = 1)
   word_length <- 4
   train <- prep_data(txns$train, word_length = word_length)
